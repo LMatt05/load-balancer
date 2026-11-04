@@ -1,0 +1,34 @@
+services:
+  backend-1:
+    image: traefik/whoami:v1.12
+    container_name: backend-1
+    command: ["--name", "backend-1"]
+    ports:
+      -   "9001:80"
+
+  backend-2:
+    image: traefik/whoami:v1.12
+    container_name: backend-2
+    command: ["--name", "backend-2"]
+    ports:
+      - "9002:80"
+
+  backend-3:
+    image: traefik/whoami:v1.12
+    container_name: backend-3
+    command: ["--name", "backend-3"]
+    ports:
+      - "9003:80"
+
+  balancer:
+    build: .
+    container_name: balancer
+    ports:
+      - "8080:8080"
+    environment:
+      BALANCER_PORT: "8080"
+      BALANCER_BACKENDS: "http://backend-1:80,http://backend-2:80,http:backend-3:80"
+    depends_on:
+      - backend-1
+      - backend-2
+      - backend-3
