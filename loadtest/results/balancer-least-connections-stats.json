@@ -1,0 +1,38 @@
+{
+  "strategy": "least-connections",
+  "uptimeSeconds": 37,
+  "healthyBackends": 3,
+  "totalBackends": 3,
+  "backends": [
+    {
+      "url": "http://backend-1:80",
+      "healthy": true,
+      "activeConnections": 0,
+      "responses": 6307,
+      "serverErrors": 0,
+      "connectionErrors": 0,
+      "avgLatencyMs": 21.57,
+      "maxLatencyMs": 80.89
+    },
+    {
+      "url": "http://backend-2:80",
+      "healthy": true,
+      "activeConnections": 0,
+      "responses": 6307,
+      "serverErrors": 0,
+      "connectionErrors": 0,
+      "avgLatencyMs": 21.57,
+      "maxLatencyMs": 83.09
+    },
+    {
+      "url": "http://backend-3:80",
+      "healthy": true,
+      "activeConnections": 0,
+      "responses": 2387,
+      "serverErrors": 0,
+      "connectionErrors": 0,
+      "avgLatencyMs": 130.25,
+      "maxLatencyMs": 227.89
+    }
+  ]
+}
