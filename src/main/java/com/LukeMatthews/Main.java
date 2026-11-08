@@ -6,7 +6,8 @@ import com.LukeMatthews.config.BalancerConfig;
 import com.LukeMatthews.health.HealthChecker;
 import com.LukeMatthews.health.HealthPolicy;
 import com.LukeMatthews.proxy.ProxyHandler;
-import com.LukeMatthews.strategy.RoundRobinStrategy;
+import com.LukeMatthews.strategy.LoadBalancingStrategy;
+import com.LukeMatthews.strategy.Strategies;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -28,8 +29,10 @@ public final class Main {
                 pool, policy, config.healthPath(), config.healthInterval(), Duration.ofSeconds(2));
         checker.start();
 
+
+        LoadBalancingStrategy strategy = Strategies.create(config.strategyName());
         HttpServer server = HttpServer.create(new InetSocketAddress(config.port()), 0);
-        server.createContext("/", new ProxyHandler(pool, new RoundRobinStrategy(), policy, config.maxAttempts()));
+        server.createContext("/", new ProxyHandler(pool, strategy, policy, config.maxAttempts()));
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
 
@@ -38,6 +41,6 @@ public final class Main {
             server.stop(1);
         }));
         LOG.log(System.Logger.Level.INFO,
-                "Balancer listening on port {0} with {1} backends", config.port(), pool.all().size());
+                "Balancer listening on port {0} with {1} backends, strategy {2}", config.port(), pool.all().size(), config.strategyName());
     }
 }

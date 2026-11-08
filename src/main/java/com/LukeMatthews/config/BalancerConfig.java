@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public record BalancerConfig(int port, List<String> backendUrls, String healthPath, Duration healthInterval, int maxAttempts) {
+public record BalancerConfig(int port, List<String> backendUrls, String healthPath, Duration healthInterval, int maxAttempts, String strategyName) {
 
     public static BalancerConfig fromEnvironment() {
         Map<String, String> env = System.getenv();
@@ -36,7 +36,9 @@ public record BalancerConfig(int port, List<String> backendUrls, String healthPa
             throw new IllegalStateException("BALANCER_MAX_ATTEMPTS must be at least 1");
         }
 
-        return new BalancerConfig(port, urls, healthPath, Duration.ofMillis(intervalMs), maxAttempts);
+        String strategyName = env.getOrDefault("BALANCER_STRATEGY", "round-robin");
+
+        return new BalancerConfig(port, urls, healthPath, Duration.ofMillis(intervalMs), maxAttempts, strategyName);
 
     }
 }

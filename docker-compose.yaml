@@ -28,6 +28,7 @@ services:
     environment:
       BALANCER_PORT: "8080"
       BALANCER_BACKENDS: "http://backend-1:80,http://backend-2:80,http://backend-3:80"
+      BALANCER_STRATEGY: "${BALANCER_STRATEGY:-round-robin}"
     depends_on:
       - backend-1
       - backend-2
