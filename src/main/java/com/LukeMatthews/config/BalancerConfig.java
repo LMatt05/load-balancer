@@ -5,12 +5,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public record BalancerConfig(int port, List<String> backendUrls, String healthPath, Duration healthInterval, int maxAttempts, String strategyName) {
+public record BalancerConfig(int port, int adminPort, List<String> backendUrls, String healthPath, Duration healthInterval, int maxAttempts, String strategyName) {
 
     public static BalancerConfig fromEnvironment() {
         Map<String, String> env = System.getenv();
 
         int port = Integer.parseInt(env.getOrDefault("BALANCER_PORT", "8080"));
+        int adminPort = Integer.parseInt(env.getOrDefault("BALANCER_ADMIN_PORT", "8081"));
+        if (adminPort == port) {
+            throw new IllegalArgumentException("BALANCER_ADMIN_PORT must differ from BALANCER_PORT");
+        }
 
         String raw = env.get("BALANCER_BACKENDS");
         if (raw == null || raw.isBlank()){
@@ -38,7 +42,7 @@ public record BalancerConfig(int port, List<String> backendUrls, String healthPa
 
         String strategyName = env.getOrDefault("BALANCER_STRATEGY", "round-robin");
 
-        return new BalancerConfig(port, urls, healthPath, Duration.ofMillis(intervalMs), maxAttempts, strategyName);
+        return new BalancerConfig(port, adminPort, urls, healthPath, Duration.ofMillis(intervalMs), maxAttempts, strategyName);
 
     }
 }

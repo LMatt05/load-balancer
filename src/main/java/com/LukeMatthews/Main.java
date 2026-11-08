@@ -9,6 +9,7 @@ import com.LukeMatthews.proxy.ProxyHandler;
 import com.LukeMatthews.strategy.LoadBalancingStrategy;
 import com.LukeMatthews.strategy.Strategies;
 import com.sun.net.httpserver.HttpServer;
+import com.LukeMatthews.admin.StatsHandler;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -36,9 +37,15 @@ public final class Main {
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
 
+        HttpServer adminServer = HttpServer.create(new InetSocketAddress(config.adminPort()), 0);
+        adminServer.createContext("/stats", new StatsHandler(pool, config.strategyName()));
+        adminServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+        adminServer.start();
+
         Runtime.getRuntime().addShutdownHook(new Thread(() ->{
             checker.close();
             server.stop(1);
+            adminServer.stop(1);
         }));
         LOG.log(System.Logger.Level.INFO,
                 "Balancer listening on port {0} with {1} backends, strategy {2}", config.port(), pool.all().size(), config.strategyName());
