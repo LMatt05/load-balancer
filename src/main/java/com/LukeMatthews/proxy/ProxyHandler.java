@@ -19,9 +19,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 public final class ProxyHandler implements HttpHandler {
     private static final System.Logger LOG = System.getLogger(ProxyHandler.class.getName());
@@ -34,21 +32,28 @@ public final class ProxyHandler implements HttpHandler {
     /** Header the JDK HttpClient sets itself and refuses to be set */
     private static final Set<String> MANAGED_BY_CLIENT = Set.of("host", "content-length", "expect");
 
+    private static final Set<String> RETRYABLE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
+
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private final BackendPool pool;
     private final LoadBalancingStrategy strategy;
     private final HealthPolicy policy;
+    private final int maxAttempts;
     private final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(2))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
 
-    public ProxyHandler(BackendPool pool, LoadBalancingStrategy strategy, HealthPolicy policy){
+    public ProxyHandler(BackendPool pool, LoadBalancingStrategy strategy, HealthPolicy policy, int maxAttempts){
+        if (maxAttempts < 1){
+            throw new IllegalArgumentException("maxAttempts must be at least 1");
+        }
         this.pool = pool;
         this.strategy = strategy;
         this.policy = policy;
+        this.maxAttempts = maxAttempts;
     }
 
     @Override
@@ -61,42 +66,57 @@ public final class ProxyHandler implements HttpHandler {
     }
 
     private void proxy(HttpExchange exchange) throws IOException {
-        Optional<Backend> chosen = strategy.select(pool.healthy());
-        if(chosen.isEmpty()){
-            respond(exchange, 503, "No healthy backends available");
-            return;
-        }
-        Backend backend = chosen.get();
+        byte[] body = exchange.getRequestBody().readAllBytes();
 
-        backend.connectionOpened();
-        try{
-            HttpResponse<InputStream> response;
-            try{
-                response = client.send(buildRequest(exchange, backend), BodyHandlers.ofInputStream());
-            } catch (IllegalArgumentException e){
-                LOG.log(System.Logger.Level.WARNING, "Could not build request for {0}: {1}", backend.uri(), e.toString());
-                respond(exchange, 400, "Bad request");
-                return;
-            } catch(IOException e) {
-                LOG.log(System.Logger.Level.WARNING, "Request to {0} failed: {1}", backend.uri(), e.toString());
-                policy.onFailure(backend);
-                respond(exchange, 502, "Bad gateway");
-                return;
-            } catch(InterruptedException e){
-                Thread.currentThread().interrupt();
-                respond(exchange, 502, "Bad gateway");
-                return;
+        int attempts = RETRYABLE_METHODS.contains(exchange.getRequestMethod()) ? maxAttempts: 1;
+        Set<Backend> tried = new HashSet<>();
+
+        for (int attempt = 1; attempt <= attempts; attempt++){
+            List<Backend> candidates = pool.healthy().stream()
+                    .filter(backend -> !tried.contains(backend))
+                    .toList();
+
+            Optional<Backend> chosen = strategy.select(candidates);
+            if(chosen.isEmpty()){
+                break;
             }
-            policy.onSuccess(backend);
-            writeResponse(exchange, response);
-        } finally{
-            backend.connectionClosed();
+            Backend backend = chosen.get();
+            tried.add(backend);
+
+            backend.connectionOpened();
+            try{
+                HttpResponse<InputStream> response;
+                try{
+                    response = client.send(buildRequest(exchange, backend, body), BodyHandlers.ofInputStream());
+                } catch (IllegalArgumentException e){
+                    LOG.log(System.Logger.Level.WARNING, "Could not build request for {0}: {1}", backend.uri(), e.toString());
+                    respond(exchange, 400, "Bad request");
+                    return;
+                } catch(IOException e) {
+                    LOG.log(System.Logger.Level.WARNING, "Attmept {0}/{1} to {2} failed: {3}", attempt, attempts, backend.uri(), e.toString());
+                    policy.onFailure(backend);
+                    continue;
+                } catch(InterruptedException e){
+                    Thread.currentThread().interrupt();
+                    respond(exchange, 502, "Bad gateway");
+                    return;
+                }
+                policy.onSuccess(backend);
+                writeResponse(exchange, response);
+                return;
+            } finally{
+                backend.connectionClosed();
+            }
+        }
+        if (tried.isEmpty()){
+            respond(exchange, 503, "No healthy backends available");
+        } else {
+            respond(exchange, 502, "Bad gateway");
         }
     }
-    private HttpRequest buildRequest(HttpExchange exchange, Backend backend) throws IOException {
+    private HttpRequest buildRequest(HttpExchange exchange, Backend backend, byte[] body) throws IOException {
         URI target = backend.resolve(exchange.getRequestURI().toString());
 
-        byte[] body = exchange.getRequestBody().readAllBytes();
         HttpRequest.BodyPublisher publisher =
                 body.length == 0 ? BodyPublishers.noBody() : BodyPublishers.ofByteArray(body);
 

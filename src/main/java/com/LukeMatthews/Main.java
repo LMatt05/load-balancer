@@ -29,7 +29,7 @@ public final class Main {
         checker.start();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(config.port()), 0);
-        server.createContext("/", new ProxyHandler(pool, new RoundRobinStrategy(), policy));
+        server.createContext("/", new ProxyHandler(pool, new RoundRobinStrategy(), policy, config.maxAttempts()));
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
 
