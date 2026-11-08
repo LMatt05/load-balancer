@@ -132,4 +132,17 @@ class ProxyHandlerRetryTest {
 
         assertFalse(dead.isHealthy());
     }
+    @Test
+    void recordsPerBackendStatsForEachAttempt() throws Exception {
+        Backend dead = dead();
+        Backend live = live();
+        URI proxy = startProxy(List.of(dead, live), 3);
+
+        send(proxy, "GET");
+
+        assertEquals(1, dead.stats().snapshot().connectionErrors());
+        assertEquals(0, dead.stats().snapshot().responses());
+        assertEquals(1, live.stats().snapshot().responses());
+        assertEquals(0, live.stats().snapshot().connectionErrors());
+    }
 }

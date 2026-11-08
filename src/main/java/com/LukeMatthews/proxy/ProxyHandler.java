@@ -87,13 +87,17 @@ public final class ProxyHandler implements HttpHandler {
             try{
                 HttpResponse<InputStream> response;
                 try{
-                    response = client.send(buildRequest(exchange, backend, body), BodyHandlers.ofInputStream());
+                    HttpRequest request = buildRequest(exchange, backend, body);
+                    long started = System.nanoTime();
+                    response = client.send(request, BodyHandlers.ofInputStream());
+                    backend.stats().recordResponse(response.statusCode(),System.nanoTime() - started);
                 } catch (IllegalArgumentException e){
                     LOG.log(System.Logger.Level.WARNING, "Could not build request for {0}: {1}", backend.uri(), e.toString());
                     respond(exchange, 400, "Bad request");
                     return;
                 } catch(IOException e) {
                     LOG.log(System.Logger.Level.WARNING, "Attmept {0}/{1} to {2} failed: {3}", attempt, attempts, backend.uri(), e.toString());
+                    backend.stats().recordConnectionError();
                     policy.onFailure(backend);
                     continue;
                 } catch(InterruptedException e){

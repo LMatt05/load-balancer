@@ -15,6 +15,7 @@ public final class Backend {
     private final AtomicInteger activeConnections = new AtomicInteger();
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
     private final AtomicInteger consecutiveSuccesses = new AtomicInteger();
+    private final BackendStats stats = new BackendStats();
 
     public Backend(URI uri){
         Objects.requireNonNull(uri, "uri");
@@ -95,5 +96,9 @@ public final class Backend {
     @Override
     public String toString(){
         return "Backend[" + uri + ", healthy=" + isHealthy() + "]";
+    }
+
+    public BackendStats stats(){
+        return stats;
     }
 }
