@@ -31,6 +31,7 @@ services:
       BALANCER_ADMIN_PORT: "8081"
       BALANCER_BACKENDS: "http://backend-1:80,http://backend-2:80,http://backend-3:80"
       BALANCER_STRATEGY: "${BALANCER_STRATEGY:-round-robin}"
+      BALANCER_MAX_ATTEMPTS: "${BALANCER_MAX_ATTEMPTS:-3}"
     depends_on:
       - backend-1
       - backend-2
