@@ -1,5 +1,6 @@
 package com.LukeMatthews.proxy;
 
+import com.LukeMatthews.health.HealthPolicy;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -37,15 +38,17 @@ public final class ProxyHandler implements HttpHandler {
 
     private final BackendPool pool;
     private final LoadBalancingStrategy strategy;
+    private final HealthPolicy policy;
     private final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(2))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
 
-    public ProxyHandler(BackendPool pool, LoadBalancingStrategy strategy){
+    public ProxyHandler(BackendPool pool, LoadBalancingStrategy strategy, HealthPolicy policy){
         this.pool = pool;
         this.strategy = strategy;
+        this.policy = policy;
     }
 
     @Override
@@ -76,6 +79,7 @@ public final class ProxyHandler implements HttpHandler {
                 return;
             } catch(IOException e) {
                 LOG.log(System.Logger.Level.WARNING, "Request to {0} failed: {1}", backend.uri(), e.toString());
+                policy.onFailure(backend);
                 respond(exchange, 502, "Bad gateway");
                 return;
             } catch(InterruptedException e){
@@ -83,17 +87,14 @@ public final class ProxyHandler implements HttpHandler {
                 respond(exchange, 502, "Bad gateway");
                 return;
             }
+            policy.onSuccess(backend);
             writeResponse(exchange, response);
         } finally{
             backend.connectionClosed();
         }
     }
     private HttpRequest buildRequest(HttpExchange exchange, Backend backend) throws IOException {
-        String base = backend.uri().toString();
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        URI target = URI.create(base + exchange.getRequestURI());
+        URI target = backend.resolve(exchange.getRequestURI().toString());
 
         byte[] body = exchange.getRequestBody().readAllBytes();
         HttpRequest.BodyPublisher publisher =
