@@ -12,7 +12,12 @@ public final class Backend {
     private final AtomicInteger activeConnections = new AtomicInteger();
 
     public Backend(URI uri){
-        this.uri = Objects.requireNonNull(uri, "uri");
+        Objects.requireNonNull(uri, "uri");
+        String scheme = uri.getScheme();
+        if(uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))){
+            throw new IllegalArgumentException("Invalid backend URL: " + uri);
+        }
+        this.uri = uri;
     }
     public static Backend of(String url){
         return new Backend(URI.create(url));

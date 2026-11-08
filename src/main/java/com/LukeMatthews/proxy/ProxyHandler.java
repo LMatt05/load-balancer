@@ -71,6 +71,7 @@ public final class ProxyHandler implements HttpHandler {
             try{
                 response = client.send(buildRequest(exchange, backend), BodyHandlers.ofInputStream());
             } catch (IllegalArgumentException e){
+                LOG.log(System.Logger.Level.WARNING, "Could not build request for {0}: {1}", backend.uri(), e.toString());
                 respond(exchange, 400, "Bad request");
                 return;
             } catch(IOException e) {
